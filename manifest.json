@@ -1,6 +1,6 @@
 {
-  "name": "OServiceTimer",
-  "short_name": "OServiceTimer",
+  "name": "OServiceStart",
+  "short_name": "OServiceStart",
   "description": "Timer sincronizzato per partenze sportive",
   "start_url": "./index.html",
   "scope": "./",

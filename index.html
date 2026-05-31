@@ -172,11 +172,12 @@
     /* ═══════════════ REAL CLOCK — BIG MODE ═══════════════ */
     .big-clock-wrap {
       display:none; flex-direction:column; align-items:center; justify-content:center;
-      /* position:fixed covers entire viewport below header, bypasses flex entirely */
       position:fixed; left:0; right:0; bottom:0;
       top:0; /* JS will set the real top after measuring header height */
       z-index:10; background:var(--dark);
       overflow:hidden;
+      /* Slight upward bias: content looks better in the upper third */
+      padding-bottom:12%;
     }
     .big-clock-wrap.active { display:flex; }
 
