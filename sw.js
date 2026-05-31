@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oservicetimer-v36';
+const CACHE_NAME = 'oservicetimer-v37';
 const ASSETS = [
   './',
   './index.html',

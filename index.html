@@ -176,8 +176,12 @@
       top:0; /* JS will set the real top after measuring header height */
       z-index:10; background:var(--dark);
       overflow:hidden;
-      /* Slight upward bias: content looks better in the upper third */
+      /* Slight upward bias when no label: content looks better in the upper third */
       padding-bottom:12%;
+    }
+    /* With label visible: device-bar already shifts the center — no extra bias needed */
+    body:has(.device-bar.visible) .big-clock-wrap {
+      padding-bottom:0;
     }
     .big-clock-wrap.active { display:flex; }
 
