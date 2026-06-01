@@ -177,7 +177,7 @@
       z-index:10; background:var(--dark);
       overflow:hidden;
       /* Slight upward bias when no label: content looks better in the upper third */
-      padding-bottom:12%;
+      padding-bottom:5%;
     }
     /* With label visible: device-bar already shifts the center — no extra bias needed */
     body:has(.device-bar.visible) .big-clock-wrap {
@@ -677,11 +677,22 @@
         <div id="clockOptions" style="display:none;flex-direction:column;gap:14px;">
 
           <div class="setting-row">
-            <label>Sfasamento<small>minuti ± rispetto all'ora reale</small></label>
-            <div class="time-picker">
+            <label>Sfasamento<small>minuti / secondi / decimi</small></label>
+          </div>
+          <div class="setting-row">
+            <div class="time-picker" style="gap:4px;flex-wrap:wrap;">
+              <span style="color:var(--gray);font-size:.8rem;min-width:14px;">m</span>
               <button class="time-btn" onclick="adjustOffset(-1)">&#8722;</button>
-              <span class="time-val wide" id="valOffset">+0 min</span>
+              <span class="time-val" id="valOffset" style="min-width:30px;">+0</span>
               <button class="time-btn" onclick="adjustOffset(+1)">+</button>
+              <span style="color:var(--gray);font-size:.8rem;min-width:10px;margin-left:6px;">s</span>
+              <button class="time-btn" onclick="adjustOffsetSec(-1)">&#8722;</button>
+              <span class="time-val" id="valOffsetSec" style="min-width:30px;">+0</span>
+              <button class="time-btn" onclick="adjustOffsetSec(+1)">+</button>
+              <span style="color:var(--gray);font-size:.8rem;min-width:18px;margin-left:6px;">/10</span>
+              <button class="time-btn" onclick="adjustOffsetTenths(-1)">&#8722;</button>
+              <span class="time-val" id="valOffsetTenths" style="min-width:30px;">+0</span>
+              <button class="time-btn" onclick="adjustOffsetTenths(+1)">+</button>
             </div>
           </div>
 
@@ -886,7 +897,17 @@ function onClockToggle() {
 function adjustOffset(d) {
   clockOffset = Math.max(-59, Math.min(59, clockOffset + d));
   const sign = clockOffset >= 0 ? '+' : '';
-  document.getElementById('valOffset').textContent = sign + clockOffset + ' min';
+  document.getElementById('valOffset').textContent = sign + clockOffset;
+}
+function adjustOffsetSec(d) {
+  clockOffsetSec = Math.max(-59, Math.min(59, clockOffsetSec + d));
+  const sign = clockOffsetSec >= 0 ? '+' : '';
+  document.getElementById('valOffsetSec').textContent = sign + clockOffsetSec;
+}
+function adjustOffsetTenths(d) {
+  clockOffsetTenths = Math.max(-9, Math.min(9, clockOffsetTenths + d));
+  const sign = clockOffsetTenths >= 0 ? '+' : '';
+  document.getElementById('valOffsetTenths').textContent = sign + clockOffsetTenths;
 }
 
 function onZeroToggle() {
@@ -934,7 +955,7 @@ function zeroTimestamp() {
 
 // Returns current display time in ms (real + offset)
 function getDisplayTime() {
-  return Date.now() + clockOffset * 60000;
+  return Date.now() + clockOffset * 60000 + clockOffsetSec * 1000 + clockOffsetTenths * 100;
 }
 
 // ════════════════════════════════════════════════════════
@@ -991,8 +1012,14 @@ function startClockTick() {
                 String(d.getSeconds()).padStart(2,'0');
       phase   = 'normal';
       subText = running ? 'IN CORSO' : 'IN ATTESA';
-      if (clockOffset !== 0) {
-        realTimeStr = 'sfas. ' + (clockOffset>=0?'+':'') + clockOffset + ' min';
+      const _totOff = clockOffset*60000 + clockOffsetSec*1000 + clockOffsetTenths*100;
+      if (_totOff !== 0) {
+        const _sign = _totOff >= 0 ? '+' : '-';
+        const _abs = Math.abs(_totOff);
+        const _om = Math.floor(_abs/60000);
+        const _os = Math.floor((_abs%60000)/1000);
+        const _ot = Math.floor((_abs%1000)/100);
+        realTimeStr = 'sfas. ' + _sign + _om + 'm ' + _os + 's .' + _ot;
       }
     }
 
