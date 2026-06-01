@@ -677,21 +677,26 @@
         <div id="clockOptions" style="display:none;flex-direction:column;gap:14px;">
 
           <div class="setting-row">
-            <label>Sfasamento<small>minuti / secondi / decimi</small></label>
+            <label>Sfasamento min<small>minuti ±</small></label>
+            <div class="time-picker">
+              <button class="time-btn" onclick="adjustOffset(-1)">&#8722;</button>
+              <span class="time-val" id="valOffset" style="min-width:36px;">+0</span>
+              <button class="time-btn" onclick="adjustOffset(+1)">+</button>
+            </div>
           </div>
           <div class="setting-row">
-            <div class="time-picker" style="gap:4px;flex-wrap:wrap;">
-              <span style="color:var(--gray);font-size:.8rem;min-width:14px;">m</span>
-              <button class="time-btn" onclick="adjustOffset(-1)">&#8722;</button>
-              <span class="time-val" id="valOffset" style="min-width:30px;">+0</span>
-              <button class="time-btn" onclick="adjustOffset(+1)">+</button>
-              <span style="color:var(--gray);font-size:.8rem;min-width:10px;margin-left:6px;">s</span>
+            <label>Sfasamento sec<small>secondi ±</small></label>
+            <div class="time-picker">
               <button class="time-btn" onclick="adjustOffsetSec(-1)">&#8722;</button>
-              <span class="time-val" id="valOffsetSec" style="min-width:30px;">+0</span>
+              <span class="time-val" id="valOffsetSec" style="min-width:36px;">+0</span>
               <button class="time-btn" onclick="adjustOffsetSec(+1)">+</button>
-              <span style="color:var(--gray);font-size:.8rem;min-width:18px;margin-left:6px;">/10</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label>Sfasamento /10<small>decimi di secondo ±</small></label>
+            <div class="time-picker">
               <button class="time-btn" onclick="adjustOffsetTenths(-1)">&#8722;</button>
-              <span class="time-val" id="valOffsetTenths" style="min-width:30px;">+0</span>
+              <span class="time-val" id="valOffsetTenths" style="min-width:36px;">+0</span>
               <button class="time-btn" onclick="adjustOffsetTenths(+1)">+</button>
             </div>
           </div>
@@ -739,6 +744,8 @@ let soundEnabled = true;
 // Clock mode
 let clockMode   = false;
 let clockOffset = 0;          // minutes offset for displayed time
+let clockOffsetSec = 0;        // seconds offset
+let clockOffsetTenths = 0;     // tenths of second offset
 let zeroMode    = false;
 let zeroHour    = 18;
 let zeroMinute  = 30;
