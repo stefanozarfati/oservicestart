@@ -768,9 +768,56 @@ const CIRC = 2 * Math.PI * 145; // ≈ 911
 // ════════════════════════════════════════════════════════
 let audioCtx = null;
 function ensureAudio() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  // Recreate the context if it was closed/lost (iOS kills it on background)
+  if (!audioCtx || audioCtx.state === 'closed') {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
 }
+
+// ── Keep audio alive: a silent looping oscillator prevents iOS
+//    from fully suspending the audio pipeline during a session ──
+let keepAliveOsc = null;
+function startAudioKeepAlive() {
+  ensureAudio();
+  if (keepAliveOsc) return;
+  try {
+    keepAliveOsc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    g.gain.value = 0.0001; // effectively silent
+    keepAliveOsc.frequency.value = 20; // sub-audible
+    keepAliveOsc.connect(g);
+    g.connect(audioCtx.destination);
+    keepAliveOsc.start();
+  } catch(e) { keepAliveOsc = null; }
+}
+function stopAudioKeepAlive() {
+  if (keepAliveOsc) { try { keepAliveOsc.stop(); } catch(e){} keepAliveOsc = null; }
+}
+
+// ── Wake Lock: keep the screen on while the app is in use ──
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch(e) { wakeLock = null; }
+}
+function releaseWakeLock() {
+  if (wakeLock) { try { wakeLock.release(); } catch(e){} wakeLock = null; }
+}
+
+// ── On returning to foreground: re-acquire wake lock and resume audio ──
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    ensureAudio();
+    if (running || clockMode) requestWakeLock();
+  }
+});
 /**
  * playBeep — crisp, defined tone using layered oscillators.
  * type: 'square' for sharp attack, blended with sine for warmth.
@@ -782,18 +829,32 @@ function playBeep(freq, dur, gainVal, fadeStart) {
   const now  = audioCtx.currentTime;
   const fade = fadeStart !== undefined ? fadeStart : dur * 0.72;
 
-  // Triangle wave: warm and round, zero metallic harshness
-  const osc = audioCtx.createOscillator();
-  const g   = audioCtx.createGain();
-  osc.type = 'triangle';
-  osc.frequency.value = freq;
-  osc.connect(g);
-  g.connect(audioCtx.destination);
+  // Compressor as a loudness maximiser — pushes perceived volume way up
+  const comp = audioCtx.createDynamicsCompressor();
+  comp.threshold.value = -24;
+  comp.knee.value = 30;
+  comp.ratio.value = 12;
+  comp.attack.value = 0.002;
+  comp.release.value = 0.1;
+  comp.connect(audioCtx.destination);
+
+  // Two detuned oscillators (triangle + square) for a fuller, louder, still-warm tone
+  const osc1 = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const g    = audioCtx.createGain();
+  osc1.type = 'triangle'; osc1.frequency.value = freq;
+  osc2.type = 'square';   osc2.frequency.value = freq;
+  osc1.connect(g); osc2.connect(g);
+  g.connect(comp);
+
+  // Boosted gain (×3) — compressor + limiter keep it clean
+  const peak = Math.min(3.0, volume * gainVal * 3.0);
   g.gain.setValueAtTime(0, now);
-  g.gain.linearRampToValueAtTime(volume * gainVal, now + 0.006);
+  g.gain.linearRampToValueAtTime(peak, now + 0.006);
   g.gain.setTargetAtTime(0, now + fade, 0.07);
-  osc.start(now);
-  osc.stop(now + dur);
+
+  osc1.start(now); osc1.stop(now + dur);
+  osc2.start(now); osc2.stop(now + dur);
 }
 
 function beepWarning()   { playBeep(370,  0.55, 0.85); }        // F#4 — caldo
@@ -896,8 +957,13 @@ function onClockToggle() {
   }
 
   document.getElementById('appBody').classList.toggle('clock-active', clockMode);
-  if (clockMode) { startClockTick(); setTimeout(fitBigClock, 60); }
-  else stopClockTick();
+  if (clockMode) {
+    startClockTick(); setTimeout(fitBigClock, 60);
+    requestWakeLock(); startAudioKeepAlive();
+  } else {
+    stopClockTick();
+    if (!running) { stopAudioKeepAlive(); releaseWakeLock(); }
+  }
   applyLayout();
 }
 
@@ -1129,6 +1195,8 @@ function handleStart() {
 function startSession() {
   running     = true;
   seriesCount = 0;
+  requestWakeLock();
+  startAudioKeepAlive();
   totalSecs   = intervalMin*60 + intervalSec;
   if (totalSecs < 10) totalSecs = 10;
   document.getElementById('seriesCount').textContent = '0';
@@ -1204,6 +1272,7 @@ function launchCycle() {
 
 function stopSession() {
   running = false;
+  if (!clockMode) { stopAudioKeepAlive(); releaseWakeLock(); }
   if (rafId) { cancelAnimationFrame(rafId); rafId=null; }
   document.getElementById('btnStart').innerHTML = '&#9654;&nbsp; AVVIA';
   document.getElementById('btnStart').classList.remove('running');
