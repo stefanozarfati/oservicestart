@@ -1056,6 +1056,14 @@ function adjustOffsetTenths(d) {
 function realignRunningCycle() {
   if (!running || currentFireDisp === null) return;
   const offsetMs = clockOffset*60000 + clockOffsetSec*1000 + clockOffsetTenths*100;
+  const nowDisp  = Date.now() + offsetMs;
+  const rem = (currentFireDisp - nowDisp) / 1000;
+  // If the new offset pushes the target into the past (would fire VIA off-grid
+  // immediately) or further than one period away, re-target the next grid point.
+  if (rem < 0.3 || rem > totalSecs) {
+    currentFireDisp = nextGridMs(nowDisp, totalSecs, 300);
+    document.getElementById('nextStart').textContent = fmtTs(currentFireDisp);
+  }
   startEpoch = currentFireDisp - offsetMs - totalSecs * 1000;
 }
 
