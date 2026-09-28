@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oservicestart-v46';
+const CACHE_NAME = 'oservicestart-v47';
 
 // Local assets that MUST be cached for offline use.
 // External resources (Google Fonts) are cached opportunistically at runtime

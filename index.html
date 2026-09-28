@@ -765,6 +765,7 @@ let remaining  = 0;
 let totalSecs  = 0;
 let seriesCount= 0;
 let startEpoch = 0;
+let currentFireDisp = null; // displayed-time (offset-adjusted) target of the in-flight cycle
 
 // Clock tick RAF
 let clockRafId = null;
@@ -1032,16 +1033,30 @@ function adjustOffset(d) {
   clockOffset = Math.max(-59, Math.min(59, clockOffset + d));
   const sign = clockOffset >= 0 ? '+' : '';
   document.getElementById('valOffset').textContent = sign + clockOffset;
+  realignRunningCycle();
 }
 function adjustOffsetSec(d) {
   clockOffsetSec = Math.max(-59, Math.min(59, clockOffsetSec + d));
   const sign = clockOffsetSec >= 0 ? '+' : '';
   document.getElementById('valOffsetSec').textContent = sign + clockOffsetSec;
+  realignRunningCycle();
 }
 function adjustOffsetTenths(d) {
   clockOffsetTenths = Math.max(-9, Math.min(9, clockOffsetTenths + d));
   const sign = clockOffsetTenths >= 0 ? '+' : '';
   document.getElementById('valOffsetTenths').textContent = sign + clockOffsetTenths;
+  realignRunningCycle();
+}
+
+// If a countdown cycle is already running when the offset is tweaked,
+// re-target it to the SAME displayed grid point using the NEW offset.
+// Without this, a live offset change only shifts the on-screen clock;
+// the beeps keep firing on the pre-adjustment schedule until the next
+// cycle (the bug: display resyncs instantly, sound doesn't).
+function realignRunningCycle() {
+  if (!running || currentFireDisp === null) return;
+  const offsetMs = clockOffset*60000 + clockOffsetSec*1000 + clockOffsetTenths*100;
+  startEpoch = currentFireDisp - offsetMs - totalSecs * 1000;
 }
 
 function onZeroToggle() {
@@ -1278,9 +1293,9 @@ function launchCycle() {
   const nowMs    = Date.now();
   const nowDisp  = nowMs + offsetMs;                      // displayed time now
   const fireDisp = nextGridMs(nowDisp, totalSecs, 1200);  // grid point in displayed time
-  const fireMs   = fireDisp - offsetMs;                   // convert back to real time for the countdown
-  startEpoch     = fireMs - totalSecs * 1000;
-  remaining      = (fireMs - nowMs) / 1000;
+  currentFireDisp = fireDisp;                             // remembered so realignRunningCycle() can re-target this cycle
+  startEpoch      = fireDisp - offsetMs - totalSecs * 1000;
+  remaining       = (startEpoch + totalSecs*1000 - nowMs) / 1000;
 
   // Show next-start time in DISPLAYED time (matches the big clock)
   document.getElementById('nextStart').textContent = fmtTs(fireDisp);
@@ -1295,7 +1310,11 @@ function launchCycle() {
 
   function tick() {
     if (!running) return;
-    remaining = Math.max(0, (fireMs - Date.now()) / 1000);
+    // Read startEpoch fresh each frame (not a frozen constant) so that
+    // realignRunningCycle() can reschedule this in-flight cycle the instant
+    // the offset changes, instead of only from the next cycle onward.
+    const fireMsNow = startEpoch + totalSecs * 1000;
+    remaining = Math.max(0, (fireMsNow - Date.now()) / 1000);
 
     if (remaining < 0.04) {
       remaining = 0; seriesCount++;
@@ -1337,6 +1356,7 @@ function launchCycle() {
 
 function stopSession() {
   running = false;
+  currentFireDisp = null;
   if (!clockMode) { stopAudioKeepAlive(); releaseWakeLock(); }
   if (rafId) { cancelAnimationFrame(rafId); rafId=null; }
   document.getElementById('btnStart').innerHTML = '&#9654;&nbsp; AVVIA';
